@@ -1,4 +1,4 @@
-import re 
+import re
 import argparse
 
 records = []
@@ -10,108 +10,122 @@ parser.add_argument("--file", required=True, help="Path to the authentication lo
 args = parser.parse_args()
 print("File path:", args.file)
 
-with open(args.file, "r") as file:
-    for line in file:
+try:
+    with open(args.file, "r") as file:
+        for line in file:
 
-        username = ""
-        pid = ""
-        ip = ""
-        timestamp = ""
-        event = ""
-        status = ""
-        port = ""
+            username = ""
+            pid = ""
+            ip = ""
+            timestamp = ""
+            event = ""
+            status = ""
+            port = ""
 
+            # Extract username
+            match = re.search(r"user=([^\s]+)", line)
 
-        # Extract username
-        match = re.search(r"user=([^\s]+)", line)
+            if not match:
+                match = re.search(r"session opened for user\s+([^\s(]+)", line)
 
-        if not match:
-            match = re.search(r"session opened for user\s+([^\s(]+)", line)
+            if not match:
+                match = re.search(r"session closed for user\s+([^\s]+)", line)
 
-        if not match:
-            match = re.search(r"session closed for user\s+([^\s]+)", line)
+            if not match:
+                match = re.search(r"of user\s+'([^']+)'", line)
 
-        if not match:
-            match = re.search(r"of user\s+'([^']+)'", line)
+            if not match:
+                match = re.search(r"(?:Accepted password for|Failed password for)\s+([^\s]+)", line)
 
-        if match:
-            username = match.group(1)
+            if not match:
+                match = re.search(r"Invalid user\s+([^\s]+)", line)
 
-        # Extract PID
-        pid_match = re.search(r"\[(\d+)\]", line)
+            if match:
+                username = match.group(1)
 
-        if pid_match:
-            pid = pid_match.group(1)
+            # Extract PID
+            pid_match = re.search(r"\[(\d+)\]", line)
 
-        # Extract IP
-        ip_match = re.search(r"from (\d+\.\d+\.\d+\.\d+)" , line)
+            if pid_match:
+                pid = pid_match.group(1)
 
-        if ip_match:
-           ip = ip_match.group(1)
+            # Extract IP
+            ip_match = re.search(r"from (\d+\.\d+\.\d+\.\d+)", line)
 
-        # Extract Port
-        port_match = re.search(r"port (\d+)", line)
+            if ip_match:
+                ip = ip_match.group(1)
 
-        if port_match:
-           port = port_match.group(1)
+            # Extract Port
+            port_match = re.search(r"port (\d+)", line)
 
-        # Extract Timestamp
-        timestamp_match = re.search(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}\+\d{2}:\d{2}", line)
+            if port_match:
+                port = port_match.group(1)
 
-        if timestamp_match:
-           timestamp = timestamp_match.group()
+            # Extract Timestamp
+            timestamp_match = re.search(
+                r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}\+\d{2}:\d{2}",
+                line
+            )
 
-        # Detect Event Type
-        if "authentication failure" in line:
-            event = "Authentication Failure"
+            if timestamp_match:
+                timestamp = timestamp_match.group()
 
-        if "session opened" in line:
-            event = "Session Open"
+            # Detect Event Type
+            if "authentication failure" in line:
+                event = "Authentication Failure"
 
-        if "session closed" in line:
-            event = "Session Close"
+            if "session opened" in line:
+                event = "Session Open"
 
-        if "COMMAND=" in line:
-            event = "Sudo Command"
+            if "session closed" in line:
+                event = "Session Close"
 
-        # Detect SSH Authentication
-        if "sshd" in line:
-            if "Accepted" in line:
-                event = "SSH Authentication"
+            if "COMMAND=" in line:
+                event = "Sudo Command"
 
-            if "Failed password" in line:
-                event = "SSH Authentication"
+            # Detect SSH Authentication
+            if "sshd" in line:
+                if "Accepted" in line:
+                    event = "SSH Authentication"
 
-            if "Invalid user" in line:
-                event = "SSH Authentication"
+                if "Failed password" in line:
+                    event = "SSH Authentication"
 
-          # Detect Status
-        if "authentication failure" in line:
-            status = "Failure"
+                if "Invalid user" in line:
+                    event = "SSH Authentication"
 
-        elif "sshd" in line and "Failed password" in line:
-            status = "Failure"
+            # Detect Status
+            if "authentication failure" in line:
+                status = "Failure"
 
-        elif "sshd" in line and "Invalid user" in line:
-            status = "Failure"
+            elif "sshd" in line and "Failed password" in line:
+                status = "Failure"
 
-        elif "sshd" in line and "Accepted" in line:
-            status = "Success"
+            elif "sshd" in line and "Invalid user" in line:
+                status = "Failure"
 
-        record = {
-            "Timestamp": timestamp,
-            "Username": username,
-            "IP": ip,
-            "PID": pid,
-            "Event": event,
-            "Status": status,
-            "Port": port
-        }
+            elif "sshd" in line and "Accepted" in line:
+                status = "Success"
 
-        if event:
-            records.append(record)
+            record = {
+                "Timestamp": timestamp,
+                "Username": username,
+                "IP": ip,
+                "PID": pid,
+                "Event": event,
+                "Status": status,
+                "Port": port
+            }
+
+            if event:
+                records.append(record)
+
+except FileNotFoundError:
+    print("Error: File not found:", args.file)
+    exit()
 
 print("Total records:", len(records))
+
 event_counts = {}
 
 for record in records:
@@ -176,7 +190,12 @@ for record in records:
 
         ip_counts[ip] += 1
 
-sorted_ip = sorted(ip_counts.items(),key=lambda item: item[1], reverse=True)
+sorted_ip = sorted(
+    ip_counts.items(),
+    key=lambda item: item[1],
+    reverse=True
+)
+
 print("Top IPs:")
 
 if sorted_ip:
