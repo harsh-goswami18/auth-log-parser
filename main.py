@@ -37,10 +37,10 @@ try:
             if not match:
                 match = re.search(r"of user\s+'([^']+)'", line)
 
-            if not match:
+            if not match and "sshd" in line:
                 match = re.search(r"(?:Accepted password for|Failed password for)\s+([^\s]+)", line)
 
-            if not match:
+            if not match and "sshd" in line:
                 match = re.search(r"Invalid user\s+([^\s]+)", line)
 
             if match:
