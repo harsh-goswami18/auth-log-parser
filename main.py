@@ -1,11 +1,14 @@
 import re
 import argparse
+import csv
+from datetime import datetime
 
 records = []
 
 parser = argparse.ArgumentParser(description="Auth Log Parser")
 
 parser.add_argument("--file", required=True, help="Path to the authentication log file")
+parser.add_argument("--csv", help="Export parsed records to a CSV file")
 
 args = parser.parse_args()
 print("File path:", args.file)
@@ -217,3 +220,47 @@ for record in records:
 print("Authentication Summary:")
 print("Successful authentications:", success_count)
 print("Failed authentications:", failure_count)
+
+
+
+
+# Brute-force detection
+FAILURE_LIMIT = 5
+TIME_DURATION = 300
+
+failed_attempts = {}
+for record in records:
+    if record["Status"] == "Failure" and record["IP"] and record["Timestamp"]:
+        time = datetime.fromisoformat(record["Timestamp"])
+
+        if record["IP"] not in failed_attempts:
+            failed_attempts[record["IP"]] = []
+
+        failed_attempts[record["IP"]].append(time)
+
+for ip, times in failed_attempts.items():
+    times.sort()
+
+    for i in range(len(times) - FAILURE_LIMIT + 1):
+        start_time = times[i]
+        end_time = times[i + FAILURE_LIMIT - 1]
+
+        time_difference = (end_time - start_time).total_seconds()
+
+        if time_difference <= TIME_DURATION:
+            print("Possible brute-force attack detected!")
+            print("IP:", ip)
+            print("Failed attempts:", FAILURE_LIMIT)
+            print("Time period:", time_difference, "seconds")
+            break
+
+if args.csv:
+    fieldnames = ["Timestamp", "Username", "IP", "PID", "Event", "Status", "Port"]
+
+    with open(args.csv, "w", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+
+        writer.writeheader()
+        writer.writerows(records)
+
+    print("CSV file created:", args.csv)
