@@ -133,4 +133,3 @@ CSV file created: output.csv
 Harsh Goswami
 B.Tech IT
 Delhi Technological University
-is this good? and doesnt look like ai generated
